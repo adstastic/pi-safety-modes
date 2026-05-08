@@ -1,0 +1,33 @@
+{
+  "name": "pi-safety-modes",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Conservative safety modes extension for Pi coding agent",
+  "keywords": ["pi-package", "pi-extension", "safety"],
+  "files": [
+    "src",
+    "README.md",
+    "config.example.json"
+  ],
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "npm run build && npm run test"
+  },
+  "dependencies": {
+    "tree-sitter-bash": "^0.25.1",
+    "web-tree-sitter": "^0.26.8"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}

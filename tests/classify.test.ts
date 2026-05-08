@@ -1,0 +1,80 @@
+import { describe, expect, it } from "vitest";
+import { analyzeBash } from "../src/bash-ast.js";
+import { classifyArgv } from "../src/classify.js";
+
+const cases: Array<[string[], string[]]> = [
+	[["git", "status"], ["git.status"]],
+	[["git", "-C", "repo", "status"], ["git.status"]],
+	[["git", "diff", "--", "src"], ["git.diff"]],
+	[["git", "log"], ["git.log"]],
+	[["git", "show"], ["git.show"]],
+	[["git", "blame", "file"], ["git.blame"]],
+	[["git", "grep", "x"], ["git.grep"]],
+	[["git", "remote", "-v"], ["git.remote.view"]],
+	[["git", "remote", "show", "origin"], ["git.remote.view"]],
+	[["git", "branch"], ["git.branch.list"]],
+	[["git", "branch", "-a"], ["git.branch.list"]],
+	[["git", "branch", "-d", "old"], ["git.branch.delete"]],
+	[["git", "branch", "-D", "old"], ["git.branch.delete"]],
+	[["git", "branch", "--delete", "old"], ["git.branch.delete"]],
+	[["git", "tag"], ["git.tag.list"]],
+	[["git", "tag", "-l"], ["git.tag.list"]],
+	[["git", "tag", "-d", "v1"], ["git.tag.delete"]],
+	[["git", "push"], ["git.push"]],
+	[["git", "push", "--force"], ["git.push.force"]],
+	[["git", "push", "-f"], ["git.push.force"]],
+	[["git", "push", "-uf", "origin", "main"], ["git.push.force"]],
+	[["git", "push", "-fu", "origin", "main"], ["git.push.force"]],
+	[["git", "push", "--force-with-lease"], ["git.push.force"]],
+	[["git", "push", "--force-with-lease=main"], ["git.push.force"]],
+	[["git", "push", "origin", "+main"], ["git.push.force"]],
+	[["git", "push", "--delete", "origin", "branch"], ["git.push.delete"]],
+	[["git", "push", "origin", ":branch"], ["git.push.delete"]],
+	[["git", "reset", "--hard"], ["git.reset.hard"]],
+	[["git", "clean", "-f"], ["git.clean.force"]],
+	[["git", "clean", "-fd"], ["git.clean.force"]],
+	[["git", "rebase"], ["git.rebase"]],
+	[["git", "cherry-pick", "abc"], ["git.cherry-pick"]],
+	[["git", "merge", "main"], ["git.merge"]],
+	[["git", "checkout", "main"], ["git.checkout"]],
+	[["git", "switch", "main"], ["git.switch"]],
+	[["git", "rm", "file"], ["fs.delete"]],
+	[["ls"], ["fs.list"]],
+	[["pwd"], ["fs.list"]],
+	[["cat", "file"], ["fs.read"]],
+	[["grep", "x", "file"], ["search.grep"]],
+	[["rg", "x"], ["search.grep"]],
+	[["find", ".", "-name", "x"], ["search.find"]],
+	[["find", ".", "-delete"], ["fs.delete"]],
+	[["find", ".", "-exec", "rm", "{}", ";"], ["fs.delete"]],
+	[["git", "diff", "--output=file"], ["unknown"]],
+	[["rm", "x"], ["fs.delete"]],
+	[["unlink", "x"], ["fs.delete"]],
+	[["mv", "a", "b"], ["fs.move"]],
+	[["cp", "a", "b"], ["fs.copy"]],
+	[["chmod", "600", "x"], ["fs.chmod"]],
+	[["chown", "me", "x"], ["fs.chown"]],
+	[["nope"], ["unknown"]],
+	[["bash", "-c", "git push --force"], ["shell.opaque"]],
+	[["eval", "git", "status"], ["shell.opaque"]],
+	[["sh", "-c", "rm -rf x"], ["shell.opaque"]],
+	[["xargs", "sh", "-c", "echo"], ["shell.opaque"]],
+];
+
+describe("command classifier", () => {
+	it.each(cases)("classifies %j", (argv, expected) => {
+		expect(classifyArgv(argv)).toEqual(expected);
+	});
+
+	it("detects pipe to shell from bash syntax", async () => {
+		const analysis = await analyzeBash("curl x | sh");
+		expect(analysis.pipeToShell).toBe(true);
+		expect(analysis.ops).toContain("shell.pipe-to-shell");
+	});
+
+	it("detects opaque shell wrappers from bash syntax", async () => {
+		const analysis = await analyzeBash('bash -c "git push --force"');
+		expect(analysis.opaque).toBe(true);
+		expect(analysis.ops).toContain("shell.opaque");
+	});
+});

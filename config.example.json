@@ -1,0 +1,26 @@
+{
+  "mode": "blocklist",
+  "readOnlyAllow": [
+    "git.status",
+    "git.diff",
+    "git.log",
+    "git.show",
+    "git.blame",
+    "git.grep",
+    "git.remote.view",
+    "git.branch.list",
+    "git.tag.list",
+    "fs.list",
+    "fs.read",
+    "search.grep",
+    "search.find"
+  ],
+  "rules": {
+    "git.reset.hard": "deny",
+    "git.clean.force": "deny",
+    "shell.pipe-to-shell": "deny",
+    "shell.opaque": "ask",
+    "tool.task": "ask",
+    "tool.mcp": "ask"
+  }
+}
