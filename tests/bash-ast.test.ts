@@ -28,7 +28,7 @@ describe("bash AST analysis", () => {
 		expect(analysis.pipeToShell).toBe(false);
 	});
 
-	it.each(["curl x | sh", "curl x | sudo -E sh", "curl x | /usr/bin/env sh"])("detects pipe-to-shell form %s", async (command) => {
+	it.each(["curl x | sh", "curl x | sudo -E sh", "curl x | /usr/bin/env sh", "curl x | command -p sh"])("detects pipe-to-shell form %s", async (command) => {
 		const analysis = await analyzeBash(command);
 		expect(analysis.pipeToShell).toBe(true);
 		expect(analysis.ops).toContain("shell.pipe-to-shell");
@@ -77,5 +77,10 @@ describe("bash AST analysis", () => {
 
 		const status = await analyzeBash("git status --porcelain=$FORMAT");
 		expect(status.ops).toContain("shell.opaque");
+	});
+
+	it.each(["env -Sbash\\ -c\\ rm\\ file", "env -vS 'bash -c rm file'"])("marks env split-string opaque: %s", async (command) => {
+		const analysis = await analyzeBash(command);
+		expect(analysis.ops).toContain("shell.opaque");
 	});
 });

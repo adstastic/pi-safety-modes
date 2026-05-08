@@ -70,9 +70,13 @@ const cases: Array<[string[], string[]]> = [
 	[["sudo", "rm", "x"], ["fs.delete"]],
 	[["sudo", "-E", "rm", "x"], ["fs.delete"]],
 	[["sudo", "-u", "root", "rm", "x"], ["fs.delete"]],
+	[["sudo", "-Eu", "root", "rm", "x"], ["fs.delete"]],
+	[["sudo", "-Hiu", "root", "rm", "x"], ["fs.delete"]],
+	[["sudo", "-uroot", "rm", "x"], ["fs.delete"]],
 	[["env", "rm", "x"], ["fs.delete"]],
 	[["/usr/bin/env", "PATH=/bin", "rm", "x"], ["fs.delete"]],
 	[["command", "rm", "x"], ["fs.delete"]],
+	[["command", "-p", "rm", "x"], ["fs.delete"]],
 	[["time", "rm", "x"], ["fs.delete"]],
 	[["timeout", "5", "rm", "x"], ["fs.delete"]],
 	[["nice", "-n", "5", "rm", "x"], ["fs.delete"]],
@@ -81,6 +85,8 @@ const cases: Array<[string[], string[]]> = [
 	[["xargs", "-0", "rm", "-f"], ["fs.delete"]],
 	[["sudo", "bash", "-c", "git reset --hard"], ["shell.opaque"]],
 	[["env", "bash", "-c", "git reset --hard"], ["shell.opaque"]],
+	[["env", "-Sbash -c rm file"], ["shell.opaque"]],
+	[["env", "-vS", "bash -c rm file"], ["shell.opaque"]],
 	[["xargs", "sh", "-c", "echo"], ["shell.opaque"]],
 ];
 

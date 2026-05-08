@@ -79,7 +79,12 @@ function isOpaqueShell(argv: string[]): boolean {
 
 function isOpaqueEnvSplit(argv: string[]): boolean {
 	const cmd = basename(argv[0]);
-	return cmd === "env" && argv.slice(1).some((arg) => arg === "-S" || arg === "--split-string" || arg.startsWith("--split-string="));
+	return cmd === "env" && argv.slice(1).some(isEnvSplitOption);
+}
+
+function isEnvSplitOption(arg: string): boolean {
+	if (arg === "-S" || arg === "--split-string" || arg.startsWith("--split-string=")) return true;
+	return arg.startsWith("-") && !arg.startsWith("--") && arg.slice(1).includes("S");
 }
 
 function unwrapWrapper(argv: string[]): string[] | undefined {
@@ -126,7 +131,7 @@ function unwrapEnv(args: string[]): string[] | undefined {
 
 function unwrapCommand(args: string[]): string[] | undefined {
 	if (args.some((arg) => arg === "-v" || arg === "-V")) return undefined;
-	return unwrapOptionWrapper(args, new Set(["-p"]));
+	return unwrapOptionWrapper(args, new Set());
 }
 
 function unwrapTimeout(args: string[]): string[] | undefined {
@@ -152,15 +157,25 @@ function skipOptions(args: string[], optionsWithValue: Set<string>): number {
 		if (arg === "--") return i + 1;
 		if (!arg.startsWith("-") || arg === "-") break;
 		const option = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
+		const clusterValue = shortClusterValue(arg, optionsWithValue);
 		const gluedValue = hasGluedShortValue(arg, optionsWithValue);
-		const separateValue = optionsWithValue.has(option) && !arg.includes("=") && !gluedValue;
+		const separateValue = (optionsWithValue.has(option) || clusterValue === "next") && !arg.includes("=") && !gluedValue;
 		i += separateValue ? 2 : 1;
 	}
 	return i;
 }
 
 function hasGluedShortValue(arg: string, optionsWithValue: Set<string>): boolean {
-	return [...optionsWithValue].some((opt) => opt.length === 2 && arg.startsWith(opt) && arg.length > 2);
+	return shortClusterValue(arg, optionsWithValue) === "glued";
+}
+
+function shortClusterValue(arg: string, optionsWithValue: Set<string>): "glued" | "next" | undefined {
+	if (!arg.startsWith("-") || arg.startsWith("--") || arg.length <= 2) return undefined;
+	const valueFlags = new Set([...optionsWithValue].filter((opt) => /^-[A-Za-z0-9]$/.test(opt)).map((opt) => opt[1]));
+	for (let i = 1; i < arg.length; i++) {
+		if (valueFlags.has(arg[i])) return i === arg.length - 1 ? "next" : "glued";
+	}
+	return undefined;
 }
 
 function isEnvAssignment(arg: string): boolean {
