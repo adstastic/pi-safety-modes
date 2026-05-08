@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release"
+        required: true
+        default: "v0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check
+        run: npm run check
+
+      - name: Pack dry run
+        run: npm pack --dry-run
+
+      - name: Write release notes
+        run: |
+          cat > release-notes.md <<EOF
+          Initial public release of pi-safety-modes.
+
+          - Extension with safety modes: readonly, blocklist, off
+          - /safety-mode command and TUI statusline
+          - Bash AST classification with wrapper/pipe-to-shell bypass regression tests
+          - Bundled pi-safety-modes skill for config/rule editing
+
+          Install:
+
+          \`\`\`bash
+          pi install git:github.com/adstastic/pi-safety-modes@${RELEASE_TAG}
+          \`\`\`
+          EOF
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "pi-safety-modes ${RELEASE_TAG}" \
+              --notes-file release-notes.md
+          else
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "pi-safety-modes ${RELEASE_TAG}" \
+              --notes-file release-notes.md
+          fi
