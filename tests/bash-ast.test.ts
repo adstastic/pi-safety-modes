@@ -79,8 +79,9 @@ describe("bash AST analysis", () => {
 		expect(status.ops).toContain("shell.opaque");
 	});
 
-	it.each(["env -Sbash\\ -c\\ rm\\ file", "env -vS 'bash -c rm file'"])("marks env split-string opaque: %s", async (command) => {
+	it.each(["env -Sbash\\ -c\\ rm\\ file", "env -vS 'bash -c rm file'"])("marks env split-string shell exec opaque: %s", async (command) => {
 		const analysis = await analyzeBash(command);
+		expect(analysis.ops).toContain("shell.exec");
 		expect(analysis.ops).toContain("shell.opaque");
 	});
 });

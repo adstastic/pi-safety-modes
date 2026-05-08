@@ -64,9 +64,10 @@ const cases: Array<[string[], string[]]> = [
 	[["chmod", "600", "x"], ["fs.chmod"]],
 	[["chown", "me", "x"], ["fs.chown"]],
 	[["nope"], ["unknown"]],
-	[["bash", "-c", "git push --force"], ["shell.opaque"]],
-	[["eval", "git", "status"], ["shell.opaque"]],
-	[["sh", "-c", "rm -rf x"], ["shell.opaque"]],
+	[["bash", "-c", "git push --force"], ["shell.exec", "shell.opaque"]],
+	[["eval", "git", "status"], ["shell.exec", "shell.opaque"]],
+	[["sh", "-c", "rm -rf x"], ["shell.exec", "shell.opaque"]],
+	[["alias", "x=rm file"], ["shell.exec", "shell.opaque"]],
 	[["sudo", "rm", "x"], ["fs.delete"]],
 	[["sudo", "-E", "rm", "x"], ["fs.delete"]],
 	[["sudo", "-u", "root", "rm", "x"], ["fs.delete"]],
@@ -83,11 +84,11 @@ const cases: Array<[string[], string[]]> = [
 	[["nohup", "rm", "x"], ["fs.delete"]],
 	[["xargs", "rm"], ["fs.delete"]],
 	[["xargs", "-0", "rm", "-f"], ["fs.delete"]],
-	[["sudo", "bash", "-c", "git reset --hard"], ["shell.opaque"]],
-	[["env", "bash", "-c", "git reset --hard"], ["shell.opaque"]],
-	[["env", "-Sbash -c rm file"], ["shell.opaque"]],
-	[["env", "-vS", "bash -c rm file"], ["shell.opaque"]],
-	[["xargs", "sh", "-c", "echo"], ["shell.opaque"]],
+	[["sudo", "bash", "-c", "git reset --hard"], ["shell.exec", "shell.opaque"]],
+	[["env", "bash", "-c", "git reset --hard"], ["shell.exec", "shell.opaque"]],
+	[["env", "-Sbash -c rm file"], ["shell.exec", "shell.opaque"]],
+	[["env", "-vS", "bash -c rm file"], ["shell.exec", "shell.opaque"]],
+	[["xargs", "sh", "-c", "echo"], ["shell.exec", "shell.opaque"]],
 ];
 
 describe("command classifier", () => {
@@ -105,5 +106,6 @@ describe("command classifier", () => {
 		const analysis = await analyzeBash('bash -c "git push --force"');
 		expect(analysis.opaque).toBe(true);
 		expect(analysis.ops).toContain("shell.opaque");
+		expect(analysis.ops).toContain("shell.exec");
 	});
 });

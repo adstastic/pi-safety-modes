@@ -1,7 +1,7 @@
 import type { Action, BashAnalysis, Mode, PolicyDecision, SafetyConfig } from "./types.js";
 
 const READ_ONLY_TOOLS = new Set(["read", "grep", "find", "ls"]);
-const NON_PERSISTABLE_ASK_OPS = new Set(["unknown", "shell.opaque", "shell.redirect-write"]);
+const NON_PERSISTABLE_ASK_OPS = new Set(["unknown", "shell.opaque", "shell.exec", "shell.redirect-write"]);
 
 export function decideToolCall(input: {
 	mode: Mode;

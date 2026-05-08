@@ -64,7 +64,8 @@ Minimal config shape:
     "git.push.force": "ask",
     "git.reset.hard": "deny",
     "git.clean.force": "deny",
-    "shell.pipe-to-shell": "deny"
+    "shell.pipe-to-shell": "deny",
+    "shell.exec": "ask"
   }
 }
 ```
@@ -110,7 +111,8 @@ Git:
 Shell/tool:
 
 - `shell.pipe-to-shell` — e.g. `curl x | sh`, including common wrappers.
-- `shell.opaque` — shell wrappers/eval/source/expansions where intent is not fully known. Not blocked by default in `blocklist`; add `"shell.opaque": "ask"` only if user wants a stricter mode.
+- `shell.exec` — dynamic shell execution such as `bash -c`, `sh -c`, `eval`, `source`, aliases, and `. script.sh`. Asks by default in `blocklist`.
+- `shell.opaque` — shell expansions or syntax where intent is not fully known. Not blocked by default in `blocklist`; add `"shell.opaque": "ask"` only if user wants a stricter mode.
 - `shell.redirect-write` — shell redirects that write files.
 - `tool.task`
 - `tool.mcp`
@@ -154,6 +156,16 @@ Block install scripts:
 {
   "rules": {
     "shell.pipe-to-shell": "deny"
+  }
+}
+```
+
+Ask before shell string execution:
+
+```json
+{
+  "rules": {
+    "shell.exec": "ask"
   }
 }
 ```

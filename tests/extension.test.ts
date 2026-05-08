@@ -68,16 +68,15 @@ describe("extension integration", () => {
 		expect(result).toBeUndefined();
 	});
 
-	it("does not offer persistent choices for explicitly configured shell.opaque", async () => {
-		await setRuleActions(["shell.opaque"], "ask", agentDir);
+	it("does not offer persistent choices for shell.exec", async () => {
 		const { handlers, ctx } = createMock(agentDir);
 		ctx.ui.select.mockResolvedValue("Allow once");
-		const result = await handlers.get("tool_call")!({ type: "tool_call", toolName: "bash", input: { command: "git status --porcelain=$FORMAT" } }, ctx);
+		const result = await handlers.get("tool_call")!({ type: "tool_call", toolName: "bash", input: { command: "bash -c 'git status'" } }, ctx);
 		expect(ctx.ui.select.mock.calls[0]?.[1]).toEqual(["Allow once", "Deny once"]);
 		expect(result).toBeUndefined();
 	});
 
-	it("blocklist allows shell.opaque by default", async () => {
+	it("blocklist allows plain shell.opaque by default", async () => {
 		const { handlers, ctx } = createMock(agentDir);
 		const result = await handlers.get("tool_call")!({ type: "tool_call", toolName: "bash", input: { command: "git status --porcelain=$FORMAT" } }, ctx);
 		expect(ctx.ui.select).not.toHaveBeenCalled();
@@ -105,10 +104,9 @@ describe("extension integration", () => {
 	});
 
 	it("no UI ask blocks", async () => {
-		await setRuleActions(["shell.opaque"], "ask", agentDir);
 		const { handlers, ctx } = createMock(agentDir);
 		ctx.hasUI = false;
-		const result = await handlers.get("tool_call")!({ type: "tool_call", toolName: "bash", input: { command: "git status --porcelain=$FORMAT" } }, ctx);
+		const result = await handlers.get("tool_call")!({ type: "tool_call", toolName: "bash", input: { command: "bash -c 'git status'" } }, ctx);
 		expect(result).toEqual(expect.objectContaining({ block: true }));
 		expect(ctx.ui.select).not.toHaveBeenCalled();
 	});

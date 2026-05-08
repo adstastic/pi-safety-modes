@@ -8,8 +8,7 @@ export function classifyArgv(argv: string[]): string[] {
 function classifyArgvInner(argv: string[], depth: number): string[] {
 	if (argv.length === 0) return [];
 	if (depth > maxWrapperDepth) return ["unknown"];
-	if (isOpaqueShell(argv)) return ["shell.opaque"];
-	if (isOpaqueEnvSplit(argv)) return ["shell.opaque"];
+	if (isShellExec(argv) || isOpaqueEnvSplit(argv)) return ["shell.exec", "shell.opaque"];
 
 	const unwrapped = unwrapWrapper(argv);
 	if (unwrapped) return classifyArgvInner(unwrapped, depth + 1);
@@ -56,6 +55,8 @@ function classifyArgvInner(argv: string[], depth: number): string[] {
 			return ["fs.write"];
 		case "sed":
 			return argv.slice(1).some((arg) => arg === "-i" || arg.startsWith("-i")) ? ["fs.write"] : ["unknown"];
+		case "alias":
+			return ["shell.exec", "shell.opaque"];
 		default:
 			return ["unknown"];
 	}
@@ -72,7 +73,7 @@ function isShellCommandInner(argv: string[], depth: number): boolean {
 	return unwrapped ? isShellCommandInner(unwrapped, depth + 1) : false;
 }
 
-function isOpaqueShell(argv: string[]): boolean {
+function isShellExec(argv: string[]): boolean {
 	const cmd = basename(argv[0]);
 	return (shellNames.has(cmd) && argv.includes("-c")) || cmd === "eval" || cmd === "source" || cmd === ".";
 }

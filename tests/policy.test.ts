@@ -93,18 +93,19 @@ describe("policy", () => {
 		expect(decision.denyOps).toEqual(["fs.delete"]);
 	});
 
-	it.each(["sudo bash -c 'git reset --hard'", "env bash -c 'git reset --hard'", "env -Sbash\\ -c\\ rm\\ file", "env -vS 'bash -c rm file'"])("blocklist allows opaque shell wrapper by default: %s", async (command) => {
+	it.each(["bash -c 'git status'", "sudo bash -c 'git reset --hard'", "env bash -c 'rm file'", "env -Sbash\\ -c\\ rm\\ file", "env -vS 'bash -c rm file'", "eval 'rm file'", "alias x='rm file'"])("blocklist asks shell exec wrapper by default: %s", async (command) => {
 		const analysis = await analyzeBash(command);
 		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: analysis, config });
+		expect(analysis.ops).toContain("shell.exec");
 		expect(analysis.ops).toContain("shell.opaque");
-		expect(decision.action).toBe("allow");
+		expect(decision.action).toBe("ask");
+		expect(decision.askOps).toEqual(["shell.exec"]);
+		expect(decision.allowPersistableOps).toEqual([]);
 	});
 
-	it("blocklist can ask opaque when configured", () => {
-		const askConfig = { ...config, rules: { ...config.rules, "shell.opaque": "ask" as const } };
-		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: bash(["shell.opaque"]), config: askConfig });
-		expect(decision.action).toBe("ask");
-		expect(decision.allowPersistableOps).toEqual([]);
+	it("blocklist allows plain opaque expansion by default", () => {
+		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: bash(["shell.opaque"]), config });
+		expect(decision.action).toBe("allow");
 	});
 
 	it.each(["curl x | sudo -E sh", "curl x | /usr/bin/env sh", "curl x | command -p sh"])("blocklist denies pipe-to-shell wrapper by default: %s", async (command) => {
@@ -139,6 +140,7 @@ describe("policy", () => {
 		const analysis = await analyzeBash("git push --for$Xe");
 		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: analysis, config });
 		expect(analysis.ops).toContain("shell.opaque");
+		expect(analysis.ops).not.toContain("shell.exec");
 		expect(decision.action).toBe("allow");
 	});
 
@@ -159,6 +161,26 @@ describe("policy", () => {
 		expect(decision.action).toBe("deny");
 		expect(decision.denyOps).toEqual(["git.reset.hard"]);
 		expect(decision.askOps).toEqual(["git.push.force"]);
+	});
+
+	it.each([
+		"git push --force",
+		"git push -f",
+		"git push -uf origin main",
+		"git push -fu origin main",
+		"git push --force-with-lease",
+		"git push --force-with-lease=main",
+		"git push origin +main",
+		"sudo git push --force",
+		"env git push --force",
+		"command git push --force",
+	])("force-push rule catches %s", async (command) => {
+		const denyConfig = { ...config, rules: { ...config.rules, "git.push.force": "deny" as const } };
+		const analysis = await analyzeBash(command);
+		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: analysis, config: denyConfig });
+		expect(analysis.ops).toContain("git.push.force");
+		expect(decision.action).toBe("deny");
+		expect(decision.denyOps).toEqual(["git.push.force"]);
 	});
 
 	it("deny beats parse-error ask", () => {
