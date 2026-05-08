@@ -82,9 +82,9 @@ Actions are `allow`, `ask`, or `deny`. In `blocklist` mode, operation IDs missin
 
 ## Operation IDs
 
-Git: `git.status`, `git.diff`, `git.log`, `git.show`, `git.blame`, `git.grep`, `git.remote.view`, `git.branch.list`, `git.branch.delete`, `git.tag.list`, `git.tag.delete`, `git.push`, `git.push.force`, `git.push.delete`, `git.reset`, `git.reset.hard`, `git.clean`, `git.clean.force`, `git.rebase`, `git.cherry-pick`, `git.merge`, `git.checkout`, `git.switch`.
+Git: `git.status`, `git.diff`, `git.log`, `git.show`, `git.blame`, `git.grep`, `git.remote.view`, `git.branch.list`, `git.branch.delete`, `git.tag.list`, `git.tag.delete`, `git.push`, `git.push.force`, `git.push.delete`, `git.reset`, `git.reset.hard`, `git.clean`, `git.clean.force`, `git.rebase`, `git.cherry-pick`, `git.merge`, `git.checkout`, `git.switch`, `git.add`, `git.commit`, `git.restore`, `git.stash`.
 
-File/search: `fs.list`, `fs.read`, `fs.delete`, `fs.move`, `fs.copy`, `fs.chmod`, `fs.chown`, `search.grep`, `search.find`.
+File/search: `fs.list`, `fs.read`, `fs.write`, `fs.delete`, `fs.move`, `fs.copy`, `fs.chmod`, `fs.chown`, `search.grep`, `search.find`.
 
 Shell: `shell.pipe-to-shell`, `shell.redirect-write`, `shell.opaque`, `unknown`.
 
@@ -93,7 +93,7 @@ Shell: `shell.pipe-to-shell`, `shell.redirect-write`, `shell.opaque`, `unknown`.
 - `git status` is allowed in `readonly`.
 - `echo hi > file` is denied in `readonly` and allowed in `blocklist` unless configured otherwise.
 - `git push --force` is allowed in `blocklist` unless configured otherwise.
-- `rm file`, `git rm file`, and `find . -delete` are allowed in `blocklist` unless configured otherwise; set `"fs.delete": "ask"` or `"deny"` to intercept them.
+- `rm file`, `sudo rm file`, `git rm file`, `find . -delete`, and `find . -exec rm {} +` are allowed in `blocklist` unless configured otherwise; set `"fs.delete": "ask"` or `"deny"` to intercept them.
 - `git reset --hard` is denied in `blocklist` by default.
 - `curl x | sh` is denied by default.
 - `bash -c "..."`, `eval`, `source`, and `. script.sh` are opaque and denied/asked depending on mode.

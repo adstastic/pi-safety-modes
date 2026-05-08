@@ -84,6 +84,30 @@ describe("policy", () => {
 		expect(decision.askOps).toEqual(["fs.delete"]);
 	});
 
+	it.each(["sudo rm file.txt", "env rm file.txt", "xargs rm", "find . -exec rm {} +"])("blocklist explicit deny catches wrapper delete: %s", async (command) => {
+		const denyConfig = { ...config, rules: { ...config.rules, "fs.delete": "deny" as const } };
+		const analysis = await analyzeBash(command);
+		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: analysis, config: denyConfig });
+		expect(analysis.ops).toContain("fs.delete");
+		expect(decision.action).toBe("deny");
+		expect(decision.denyOps).toEqual(["fs.delete"]);
+	});
+
+	it.each(["sudo bash -c 'git reset --hard'", "env bash -c 'git reset --hard'"])("blocklist asks opaque shell wrapper by default: %s", async (command) => {
+		const analysis = await analyzeBash(command);
+		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: analysis, config });
+		expect(analysis.ops).toContain("shell.opaque");
+		expect(decision.action).toBe("ask");
+	});
+
+	it.each(["curl x | sudo -E sh", "curl x | /usr/bin/env sh"])("blocklist denies pipe-to-shell wrapper by default: %s", async (command) => {
+		const analysis = await analyzeBash(command);
+		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: analysis, config });
+		expect(analysis.ops).toContain("shell.pipe-to-shell");
+		expect(decision.action).toBe("deny");
+		expect(decision.denyOps).toEqual(["shell.pipe-to-shell"]);
+	});
+
 	it("blocklist denies git.reset.hard by default", () => {
 		expect(decideToolCall({ mode: "blocklist", toolName: "bash", bash: bash(["git.reset.hard"]), config }).action).toBe("deny");
 	});

@@ -1,8 +1,18 @@
 const shellNames = new Set(["bash", "sh", "zsh", "fish"]);
+const maxWrapperDepth = 8;
 
 export function classifyArgv(argv: string[]): string[] {
+	return classifyArgvInner(argv, 0);
+}
+
+function classifyArgvInner(argv: string[], depth: number): string[] {
 	if (argv.length === 0) return [];
-	if (isOpaqueWrapper(argv)) return ["shell.opaque"];
+	if (depth > maxWrapperDepth) return ["unknown"];
+	if (isOpaqueShell(argv)) return ["shell.opaque"];
+	if (isOpaqueEnvSplit(argv)) return ["shell.opaque"];
+
+	const unwrapped = unwrapWrapper(argv);
+	if (unwrapped) return classifyArgvInner(unwrapped, depth + 1);
 
 	const command = basename(argv[0]);
 	if (command === "git") return classifyGit(argv.slice(1));
@@ -30,28 +40,131 @@ export function classifyArgv(argv: string[]): string[] {
 		case "mv":
 			return ["fs.move"];
 		case "cp":
+		case "rsync":
 			return ["fs.copy"];
 		case "chmod":
 			return ["fs.chmod"];
 		case "chown":
 			return ["fs.chown"];
+		case "mkdir":
+		case "touch":
+		case "tee":
+		case "install":
+		case "ln":
+		case "truncate":
+		case "dd":
+			return ["fs.write"];
+		case "sed":
+			return argv.slice(1).some((arg) => arg === "-i" || arg.startsWith("-i")) ? ["fs.write"] : ["unknown"];
 		default:
 			return ["unknown"];
 	}
 }
 
 export function isShellCommand(argv: string[]): boolean {
-	return argv.length > 0 && shellNames.has(basename(argv[0]));
+	return isShellCommandInner(argv, 0);
 }
 
-function isOpaqueWrapper(argv: string[]): boolean {
+function isShellCommandInner(argv: string[], depth: number): boolean {
+	if (argv.length === 0 || depth > maxWrapperDepth) return false;
+	if (shellNames.has(basename(argv[0]))) return true;
+	const unwrapped = unwrapWrapper(argv);
+	return unwrapped ? isShellCommandInner(unwrapped, depth + 1) : false;
+}
+
+function isOpaqueShell(argv: string[]): boolean {
 	const cmd = basename(argv[0]);
-	if ((shellNames.has(cmd) && argv.includes("-c")) || cmd === "eval" || cmd === "source" || cmd === ".") return true;
-	if (cmd !== "xargs") return false;
-	for (let i = 1; i < argv.length - 1; i++) {
-		if (shellNames.has(basename(argv[i])) && argv.slice(i + 1).includes("-c")) return true;
+	return (shellNames.has(cmd) && argv.includes("-c")) || cmd === "eval" || cmd === "source" || cmd === ".";
+}
+
+function isOpaqueEnvSplit(argv: string[]): boolean {
+	const cmd = basename(argv[0]);
+	return cmd === "env" && argv.slice(1).some((arg) => arg === "-S" || arg === "--split-string" || arg.startsWith("--split-string="));
+}
+
+function unwrapWrapper(argv: string[]): string[] | undefined {
+	const cmd = basename(argv[0]);
+	switch (cmd) {
+		case "sudo":
+		case "doas":
+			return unwrapOptionWrapper(argv.slice(1), sudoOptionsWithValue);
+		case "env":
+			return unwrapEnv(argv.slice(1));
+		case "command":
+			return unwrapCommand(argv.slice(1));
+		case "time":
+			return unwrapOptionWrapper(argv.slice(1), new Set());
+		case "timeout":
+			return unwrapTimeout(argv.slice(1));
+		case "nice":
+			return unwrapNice(argv.slice(1));
+		case "nohup":
+			return argv.length > 1 ? argv.slice(1) : undefined;
+		case "xargs":
+			return unwrapXargs(argv.slice(1));
+		default:
+			return undefined;
 	}
-	return false;
+}
+
+const sudoOptionsWithValue = new Set(["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--close-from", "-D", "--chdir", "-T", "--command-timeout"]);
+const envOptionsWithValue = new Set(["-u", "--unset", "-C", "--chdir", "-0", "--argv0"]);
+const timeoutOptionsWithValue = new Set(["-k", "--kill-after", "-s", "--signal"]);
+const niceOptionsWithValue = new Set(["-n", "--adjustment"]);
+const xargsOptionsWithValue = new Set(["-a", "--arg-file", "-d", "--delimiter", "-E", "--eof", "-I", "--replace", "-i", "-L", "--max-lines", "-n", "--max-args", "-P", "--max-procs", "-s", "--max-chars"]);
+
+function unwrapOptionWrapper(args: string[], optionsWithValue: Set<string>): string[] | undefined {
+	const index = skipOptions(args, optionsWithValue);
+	return index < args.length ? args.slice(index) : undefined;
+}
+
+function unwrapEnv(args: string[]): string[] | undefined {
+	let i = skipOptions(args, envOptionsWithValue);
+	while (i < args.length && isEnvAssignment(args[i])) i++;
+	return i < args.length ? args.slice(i) : undefined;
+}
+
+function unwrapCommand(args: string[]): string[] | undefined {
+	if (args.some((arg) => arg === "-v" || arg === "-V")) return undefined;
+	return unwrapOptionWrapper(args, new Set(["-p"]));
+}
+
+function unwrapTimeout(args: string[]): string[] | undefined {
+	const i = skipOptions(args, timeoutOptionsWithValue);
+	return i + 1 < args.length ? args.slice(i + 1) : undefined;
+}
+
+function unwrapNice(args: string[]): string[] | undefined {
+	let i = skipOptions(args, niceOptionsWithValue);
+	if (i < args.length && /^-\d+$/.test(args[i])) i++;
+	return i < args.length ? args.slice(i) : undefined;
+}
+
+function unwrapXargs(args: string[]): string[] | undefined {
+	const i = skipOptions(args, xargsOptionsWithValue);
+	return i < args.length ? args.slice(i) : undefined;
+}
+
+function skipOptions(args: string[], optionsWithValue: Set<string>): number {
+	let i = 0;
+	while (i < args.length) {
+		const arg = args[i];
+		if (arg === "--") return i + 1;
+		if (!arg.startsWith("-") || arg === "-") break;
+		const option = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
+		const gluedValue = hasGluedShortValue(arg, optionsWithValue);
+		const separateValue = optionsWithValue.has(option) && !arg.includes("=") && !gluedValue;
+		i += separateValue ? 2 : 1;
+	}
+	return i;
+}
+
+function hasGluedShortValue(arg: string, optionsWithValue: Set<string>): boolean {
+	return [...optionsWithValue].some((opt) => opt.length === 2 && arg.startsWith(opt) && arg.length > 2);
+}
+
+function isEnvAssignment(arg: string): boolean {
+	return /^[A-Za-z_][A-Za-z0-9_]*=/.test(arg);
 }
 
 function classifyGit(args: string[]): string[] {
@@ -105,6 +218,14 @@ function classifyGit(args: string[]): string[] {
 			return ["git.checkout"];
 		case "switch":
 			return ["git.switch"];
+		case "add":
+			return ["git.add"];
+		case "commit":
+			return ["git.commit"];
+		case "restore":
+			return ["git.restore"];
+		case "stash":
+			return ["git.stash"];
 		case "rm":
 			return ["fs.delete"];
 		default:

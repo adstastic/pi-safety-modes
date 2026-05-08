@@ -1,25 +1,12 @@
 import type { ExtensionAPI, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
 import { analyzeBash } from "./bash-ast.js";
-import { loadSafetyConfig, setConfigMode, setRuleActions } from "./config.js";
+import { loadSafetyConfig, parseMode, setConfigMode, setRuleActions } from "./config.js";
 import { decideToolCall } from "./policy.js";
 import type { Mode, PolicyDecision } from "./types.js";
 
 export interface SafetyExtensionOptions {
 	agentDir?: string;
 }
-
-const aliases: Record<string, Mode> = {
-	off: "off",
-	unrestricted: "off",
-	blocklist: "blocklist",
-	protected: "blocklist",
-	protect: "blocklist",
-	rules: "blocklist",
-	denylist: "blocklist",
-	readonly: "readonly",
-	"read-only": "readonly",
-	ro: "readonly",
-};
 
 export default function registerSafetyModes(pi: ExtensionAPI, options: SafetyExtensionOptions = {}): void {
 	const agentDir = options.agentDir;
@@ -42,7 +29,7 @@ export default function registerSafetyModes(pi: ExtensionAPI, options: SafetyExt
 	pi.registerCommand("safety-mode", {
 		description: "Show or set safety mode (readonly, blocklist, off)",
 		handler: async (args, ctx) => {
-			const requested = args.trim().toLowerCase();
+			const requested = args.trim();
 			if (!requested) {
 				const loaded = await loadSafetyConfig(agentDir);
 				setStatus(ctx, loaded.config.mode);
@@ -50,7 +37,7 @@ export default function registerSafetyModes(pi: ExtensionAPI, options: SafetyExt
 				return;
 			}
 
-			const mode = aliases[requested];
+			const mode = parseMode(requested);
 			if (!mode) {
 				ctx.ui.notify("Usage: /safety-mode [readonly|blocklist|off]", "warning");
 				return;

@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { Action, Mode, SafetyConfig } from "./types.js";
@@ -51,6 +51,10 @@ const modeAliases: Record<string, Mode> = {
 };
 const actions = new Set<Action>(["allow", "ask", "deny"]);
 
+export function parseMode(value: unknown): Mode | undefined {
+	return typeof value === "string" ? modeAliases[value.trim().toLowerCase()] : undefined;
+}
+
 export function getConfigPath(agentDir = getAgentDir()): string {
 	return join(agentDir, "extensions", "pi-safety-modes", "config.json");
 }
@@ -91,15 +95,20 @@ export async function setRuleActions(ops: string[], action: Action, agentDir?: s
 
 export async function writeRawConfig(path: string, raw: Record<string, unknown>): Promise<void> {
 	await mkdir(dirname(path), { recursive: true });
-	const tmp = `${path}.tmp`;
-	await writeFile(tmp, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
-	await rename(tmp, path);
+	const tmp = `${path}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+	try {
+		await writeFile(tmp, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+		await rename(tmp, path);
+	} catch (error) {
+		await unlink(tmp).catch(() => undefined);
+		throw error;
+	}
 }
 
 function normalizeConfig(raw: Record<string, unknown>, warnings: string[]): SafetyConfig {
 	const config = cloneConfig(DEFAULT_CONFIG);
 
-	const mode = typeof raw.mode === "string" ? modeAliases[raw.mode] : undefined;
+	const mode = parseMode(raw.mode);
 	if (mode) config.mode = mode;
 	else if (raw.mode !== undefined) warnings.push(`Invalid mode ${JSON.stringify(raw.mode)}; using blocklist.`);
 

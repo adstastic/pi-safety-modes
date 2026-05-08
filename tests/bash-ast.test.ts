@@ -28,6 +28,12 @@ describe("bash AST analysis", () => {
 		expect(analysis.pipeToShell).toBe(false);
 	});
 
+	it.each(["curl x | sh", "curl x | sudo -E sh", "curl x | /usr/bin/env sh"])("detects pipe-to-shell form %s", async (command) => {
+		const analysis = await analyzeBash(command);
+		expect(analysis.pipeToShell).toBe(true);
+		expect(analysis.ops).toContain("shell.pipe-to-shell");
+	});
+
 	it("marks truncating redirects as writes", async () => {
 		const analysis = await analyzeBash("echo hi > file.txt");
 		expect(analysis.writes).toBe(true);
