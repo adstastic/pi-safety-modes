@@ -4,32 +4,27 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Existing tag to release"
-        required: true
-        default: "v0.1.0"
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: npm
     steps:
-      - name: Checkout release ref
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          registry-url: https://registry.npmjs.org
           cache: npm
 
       - name: Install dependencies
@@ -41,63 +36,70 @@ jobs:
       - name: Pack dry run
         run: npm pack --dry-run
 
-      - name: Resolve release tag
-        id: release
+      - name: Resolve package version
+        id: meta
         run: |
           set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          tag="v${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
 
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            tag="${{ inputs.tag }}"
-            kind="manual"
-          elif [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
-            tag="$GITHUB_REF_NAME"
-            kind="tag"
+          if npm view "pi-safety-modes@${version}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
           else
-            tag="main-$(git rev-parse --short=12 HEAD)"
-            kind="main"
-            if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-              git tag "$tag" "$(git rev-parse HEAD)"
-              git push origin "refs/tags/$tag"
-            fi
+            echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+      - name: Stop when version already published
+        if: steps.meta.outputs.published == 'true'
+        run: echo "pi-safety-modes@${{ steps.meta.outputs.version }} already published; skipping release."
 
-      - name: Write release notes
+      - name: Create tag
+        if: steps.meta.outputs.published == 'false'
         run: |
           set -euo pipefail
-          tag="${{ steps.release.outputs.tag }}"
-          kind="${{ steps.release.outputs.kind }}"
+          tag="${{ steps.meta.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Tag ${tag} already exists locally."
+          else
+            git tag "${tag}"
+          fi
+          git push origin "refs/tags/${tag}"
+
+      - name: Write release notes
+        if: steps.meta.outputs.published == 'false'
+        run: |
+          set -euo pipefail
+          tag="${{ steps.meta.outputs.tag }}"
+          version="${{ steps.meta.outputs.version }}"
           commit="$(git rev-parse --short=12 HEAD)"
 
           {
             echo "pi-safety-modes ${tag}"
             echo
-            if [ "$kind" = "main" ]; then
-              echo "Automated release for main commit \`${commit}\`."
-            else
-              echo "Release for tag \`${tag}\`."
-            fi
-            echo
-            echo "- Extension with safety modes: readonly, blocklist, off"
-            echo "- /safety-mode command and TUI statusline"
-            echo "- Bash AST classification with wrapper/pipe-to-shell bypass regression tests"
-            echo "- Bundled pi-safety-modes skill for config/rule editing"
+            echo "Automated release for package version \`${version}\` at commit \`${commit}\`."
             echo
             echo "Install:"
             echo
             echo "\`\`\`bash"
+            echo "pi install npm:pi-safety-modes@${version}"
+            echo "# or"
             echo "pi install git:github.com/adstastic/pi-safety-modes@${tag}"
             echo "\`\`\`"
           } > release-notes.md
 
+      - name: Publish npm
+        if: steps.meta.outputs.published == 'false'
+        run: npm publish --provenance
+
       - name: Create or update GitHub release
+        if: steps.meta.outputs.published == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="${{ steps.release.outputs.tag }}"
+          tag="${{ steps.meta.outputs.tag }}"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release edit "$tag" \
               --title "pi-safety-modes ${tag}" \
