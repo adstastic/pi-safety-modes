@@ -2,12 +2,14 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release"
+        description: "Existing tag to release"
         required: true
         default: "v0.1.0"
 
@@ -17,13 +19,12 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
-      - name: Checkout release tag
+      - name: Checkout release ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -40,34 +41,70 @@ jobs:
       - name: Pack dry run
         run: npm pack --dry-run
 
+      - name: Resolve release tag
+        id: release
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+            kind="manual"
+          elif [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            tag="$GITHUB_REF_NAME"
+            kind="tag"
+          else
+            tag="main-$(git rev-parse --short=12 HEAD)"
+            kind="main"
+            if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              git tag "$tag" "$(git rev-parse HEAD)"
+              git push origin "refs/tags/$tag"
+            fi
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+
       - name: Write release notes
         run: |
-          cat > release-notes.md <<EOF
-          Initial public release of pi-safety-modes.
+          set -euo pipefail
+          tag="${{ steps.release.outputs.tag }}"
+          kind="${{ steps.release.outputs.kind }}"
+          commit="$(git rev-parse --short=12 HEAD)"
 
-          - Extension with safety modes: readonly, blocklist, off
-          - /safety-mode command and TUI statusline
-          - Bash AST classification with wrapper/pipe-to-shell bypass regression tests
-          - Bundled pi-safety-modes skill for config/rule editing
-
-          Install:
-
-          \`\`\`bash
-          pi install git:github.com/adstastic/pi-safety-modes@${RELEASE_TAG}
-          \`\`\`
-          EOF
+          {
+            echo "pi-safety-modes ${tag}"
+            echo
+            if [ "$kind" = "main" ]; then
+              echo "Automated release for main commit \`${commit}\`."
+            else
+              echo "Release for tag \`${tag}\`."
+            fi
+            echo
+            echo "- Extension with safety modes: readonly, blocklist, off"
+            echo "- /safety-mode command and TUI statusline"
+            echo "- Bash AST classification with wrapper/pipe-to-shell bypass regression tests"
+            echo "- Bundled pi-safety-modes skill for config/rule editing"
+            echo
+            echo "Install:"
+            echo
+            echo "\`\`\`bash"
+            echo "pi install git:github.com/adstastic/pi-safety-modes@${tag}"
+            echo "\`\`\`"
+          } > release-notes.md
 
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" \
-              --title "pi-safety-modes ${RELEASE_TAG}" \
+          set -euo pipefail
+          tag="${{ steps.release.outputs.tag }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" \
+              --title "pi-safety-modes ${tag}" \
               --notes-file release-notes.md
           else
-            gh release create "$RELEASE_TAG" \
+            gh release create "$tag" \
               --verify-tag \
-              --title "pi-safety-modes ${RELEASE_TAG}" \
+              --title "pi-safety-modes ${tag}" \
               --notes-file release-notes.md
           fi
