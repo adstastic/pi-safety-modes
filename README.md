@@ -51,6 +51,16 @@ Use:
 
 Legacy aliases still work: `read-only`, `ro`, `protected`, `protect`, `rules`, `denylist`, `unrestricted`.
 
+## Skill
+
+This package also ships a skill so agents can configure it when asked:
+
+```text
+/skill:pi-safety-modes set fs.delete to ask
+```
+
+Skill helps with mode changes, config path, and rule edits. It is guidance only; enforcement lives in extension.
+
 ## Config
 
 Config lives at:

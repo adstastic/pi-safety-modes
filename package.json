@@ -24,6 +24,7 @@
   },
   "files": [
     "src",
+    "skills",
     "README.md",
     "LICENSE",
     "config.example.json"
@@ -31,6 +32,9 @@
   "pi": {
     "extensions": [
       "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
     ]
   },
   "scripts": {
