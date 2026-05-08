@@ -4,7 +4,19 @@ A small Pi extension that adds conservative runtime safety modes for tool calls.
 
 > This extension is not a sandbox. It is a command guardrail. It protects against common accidental destructive operations by parsing bash syntax and classifying commands. It does not defend against a malicious local user, shell aliases/functions, hostile environment variables, or tools that mutate state through unrecognized channels.
 
-## Install locally
+## Install
+
+From npm:
+
+```bash
+pi install npm:pi-safety-modes
+```
+
+Try without installing:
+
+```bash
+pi -e npm:pi-safety-modes
+```
 
 From this repository:
 
