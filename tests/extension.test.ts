@@ -68,7 +68,8 @@ describe("extension integration", () => {
 		expect(result).toBeUndefined();
 	});
 
-	it("does not offer persistent choices for shell.opaque", async () => {
+	it("does not offer persistent choices for explicitly configured shell.opaque", async () => {
+		await setRuleActions(["shell.opaque"], "ask", agentDir);
 		const { handlers, ctx } = createMock(agentDir);
 		ctx.ui.select.mockResolvedValue("Allow once");
 		const result = await handlers.get("tool_call")!({ type: "tool_call", toolName: "bash", input: { command: "git status --porcelain=$FORMAT" } }, ctx);
@@ -76,11 +77,10 @@ describe("extension integration", () => {
 		expect(result).toBeUndefined();
 	});
 
-	it("does not offer persistent choices when shell.opaque is mixed with git.push.force", async () => {
+	it("blocklist allows shell.opaque by default", async () => {
 		const { handlers, ctx } = createMock(agentDir);
-		ctx.ui.select.mockResolvedValue("Allow once");
-		const result = await handlers.get("tool_call")!({ type: "tool_call", toolName: "bash", input: { command: "git push --force $REMOTE" } }, ctx);
-		expect(ctx.ui.select.mock.calls[0]?.[1]).toEqual(["Allow once", "Deny once"]);
+		const result = await handlers.get("tool_call")!({ type: "tool_call", toolName: "bash", input: { command: "git status --porcelain=$FORMAT" } }, ctx);
+		expect(ctx.ui.select).not.toHaveBeenCalled();
 		expect(result).toBeUndefined();
 	});
 
@@ -105,6 +105,7 @@ describe("extension integration", () => {
 	});
 
 	it("no UI ask blocks", async () => {
+		await setRuleActions(["shell.opaque"], "ask", agentDir);
 		const { handlers, ctx } = createMock(agentDir);
 		ctx.hasUI = false;
 		const result = await handlers.get("tool_call")!({ type: "tool_call", toolName: "bash", input: { command: "git status --porcelain=$FORMAT" } }, ctx);

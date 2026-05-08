@@ -64,8 +64,7 @@ Minimal config shape:
     "git.push.force": "ask",
     "git.reset.hard": "deny",
     "git.clean.force": "deny",
-    "shell.pipe-to-shell": "deny",
-    "shell.opaque": "ask"
+    "shell.pipe-to-shell": "deny"
   }
 }
 ```
@@ -111,7 +110,7 @@ Git:
 Shell/tool:
 
 - `shell.pipe-to-shell` — e.g. `curl x | sh`, including common wrappers.
-- `shell.opaque` — shell wrappers/eval/source/expansions where intent is not fully known.
+- `shell.opaque` — shell wrappers/eval/source/expansions where intent is not fully known. Not blocked by default in `blocklist`; add `"shell.opaque": "ask"` only if user wants a stricter mode.
 - `shell.redirect-write` — shell redirects that write files.
 - `tool.task`
 - `tool.mcp`

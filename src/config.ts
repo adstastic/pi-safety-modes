@@ -24,7 +24,6 @@ export const DEFAULT_CONFIG: SafetyConfig = {
 		"git.reset.hard": "deny",
 		"git.clean.force": "deny",
 		"shell.pipe-to-shell": "deny",
-		"shell.opaque": "ask",
 		"tool.task": "ask",
 		"tool.mcp": "ask",
 	},

@@ -81,7 +81,6 @@ Example:
     "git.reset.hard": "deny",
     "git.clean.force": "deny",
     "shell.pipe-to-shell": "deny",
-    "shell.opaque": "ask",
     "tool.task": "ask",
     "tool.mcp": "ask"
   }
@@ -106,8 +105,8 @@ Shell: `shell.pipe-to-shell`, `shell.redirect-write`, `shell.opaque`, `unknown`.
 - `rm file`, `sudo rm file`, `git rm file`, `find . -delete`, and `find . -exec rm {} +` are allowed in `blocklist` unless configured otherwise; set `"fs.delete": "ask"` or `"deny"` to intercept them.
 - `git reset --hard` is denied in `blocklist` by default.
 - `curl x | sh` is denied by default.
-- `bash -c "..."`, `eval`, `source`, and `. script.sh` are opaque and denied/asked depending on mode.
+- `bash -c "..."`, `eval`, `source`, shell expansions, and `. script.sh` are `shell.opaque`; allowed in `blocklist` by default, denied in `readonly`.
 
 ## Known limitations
 
-This is a guardrail, not isolation. It does not emulate shell execution, expand variables, inspect aliases/functions, or understand every command's side effects. Unknown commands are denied in `readonly` and allowed in `blocklist` unless configured otherwise.
+This is a guardrail, not isolation. It does not emulate shell execution, expand variables, inspect aliases/functions, or understand every command's side effects. Unknown and opaque commands are denied in `readonly` and allowed in `blocklist` unless configured otherwise.

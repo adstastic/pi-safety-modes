@@ -93,11 +93,18 @@ describe("policy", () => {
 		expect(decision.denyOps).toEqual(["fs.delete"]);
 	});
 
-	it.each(["sudo bash -c 'git reset --hard'", "env bash -c 'git reset --hard'", "env -Sbash\\ -c\\ rm\\ file", "env -vS 'bash -c rm file'"])("blocklist asks opaque shell wrapper by default: %s", async (command) => {
+	it.each(["sudo bash -c 'git reset --hard'", "env bash -c 'git reset --hard'", "env -Sbash\\ -c\\ rm\\ file", "env -vS 'bash -c rm file'"])("blocklist allows opaque shell wrapper by default: %s", async (command) => {
 		const analysis = await analyzeBash(command);
 		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: analysis, config });
 		expect(analysis.ops).toContain("shell.opaque");
+		expect(decision.action).toBe("allow");
+	});
+
+	it("blocklist can ask opaque when configured", () => {
+		const askConfig = { ...config, rules: { ...config.rules, "shell.opaque": "ask" as const } };
+		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: bash(["shell.opaque"]), config: askConfig });
 		expect(decision.action).toBe("ask");
+		expect(decision.allowPersistableOps).toEqual([]);
 	});
 
 	it.each(["curl x | sudo -E sh", "curl x | /usr/bin/env sh", "curl x | command -p sh"])("blocklist denies pipe-to-shell wrapper by default: %s", async (command) => {
@@ -110,12 +117,6 @@ describe("policy", () => {
 
 	it("blocklist denies git.reset.hard by default", () => {
 		expect(decideToolCall({ mode: "blocklist", toolName: "bash", bash: bash(["git.reset.hard"]), config }).action).toBe("deny");
-	});
-
-	it("blocklist asks opaque by default", () => {
-		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: bash(["shell.opaque"]), config });
-		expect(decision.action).toBe("ask");
-		expect(decision.allowPersistableOps).toEqual([]);
 	});
 
 	it("blocklist allows shell redirection writes unless configured otherwise", async () => {
@@ -134,12 +135,11 @@ describe("policy", () => {
 		expect(decision.denyOps).toEqual(["shell.redirect-write"]);
 	});
 
-	it("blocklist asks when a force-like push arg contains expansion", async () => {
+	it("blocklist allows expansion opacity by default", async () => {
 		const analysis = await analyzeBash("git push --for$Xe");
 		const decision = decideToolCall({ mode: "blocklist", toolName: "bash", bash: analysis, config });
 		expect(analysis.ops).toContain("shell.opaque");
-		expect(decision.action).toBe("ask");
-		expect(decision.askOps).toContain("shell.opaque");
+		expect(decision.action).toBe("allow");
 	});
 
 	it("readonly denies expansion-containing status args", async () => {
