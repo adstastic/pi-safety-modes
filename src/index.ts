@@ -8,6 +8,14 @@ export interface SafetyExtensionOptions {
 	agentDir?: string;
 }
 
+const modeCycle: Mode[] = ["blocklist", "readonly", "off"];
+const ANSI_RESET = "\u001b[0m";
+const statusColors: Record<Mode, string> = {
+	readonly: "\u001b[32m",
+	blocklist: "\u001b[33m",
+	off: "\u001b[31m",
+};
+
 export default function registerSafetyModes(pi: ExtensionAPI, options: SafetyExtensionOptions = {}): void {
 	const agentDir = options.agentDir;
 
@@ -24,6 +32,11 @@ export default function registerSafetyModes(pi: ExtensionAPI, options: SafetyExt
 		const bash = command !== undefined ? await analyzeBash(command) : undefined;
 		const decision = decideToolCall({ mode: loaded.config.mode, toolName: event.toolName, bash, config: loaded.config });
 		return handleDecision(decision, ctx, agentDir, command);
+	});
+
+	pi.registerShortcut("alt+s", {
+		description: "Cycle safety mode (blocklist → readonly → off)",
+		handler: async (ctx) => cycleSafetyMode(ctx, agentDir),
 	});
 
 	pi.registerCommand("safety-mode", {
@@ -48,6 +61,15 @@ export default function registerSafetyModes(pi: ExtensionAPI, options: SafetyExt
 			ctx.ui.notify(`Safety mode set to ${loaded.config.mode}\nConfig: ${loaded.path}`, "info");
 		},
 	});
+}
+
+async function cycleSafetyMode(ctx: { ui: { notify: (message: string, level?: "info" | "warning" | "error") => void; setStatus?: (key: string, text: string | undefined) => void } }, agentDir?: string): Promise<void> {
+	const loaded = await loadSafetyConfig(agentDir);
+	const index = modeCycle.indexOf(loaded.config.mode);
+	const nextMode = modeCycle[(index + 1) % modeCycle.length] ?? modeCycle[0];
+	const updated = await setConfigMode(nextMode, agentDir);
+	setStatus(ctx, updated.config.mode);
+	ctx.ui.notify(`Safety mode: ${loaded.config.mode} → ${updated.config.mode}`, "info");
 }
 
 async function handleDecision(decision: PolicyDecision, ctx: { hasUI: boolean; ui: { select: (title: string, options: string[]) => Promise<string | undefined> } }, agentDir?: string, command?: string): Promise<ToolCallEventResult | undefined> {
@@ -84,7 +106,7 @@ function preview(text: string): string {
 }
 
 function setStatus(ctx: { ui: { setStatus?: (key: string, text: string | undefined) => void } }, mode: Mode): void {
-	ctx.ui.setStatus?.("pi-safety-modes", `safety:${mode}`);
+	ctx.ui.setStatus?.("pi-safety-modes", `${statusColors[mode]}safety:${mode}${ANSI_RESET}`);
 }
 
 function getBashCommand(event: ToolCallEvent): string | undefined {

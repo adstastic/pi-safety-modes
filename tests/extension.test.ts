@@ -7,12 +7,20 @@ import { getConfigPath, setConfigMode, setRuleActions } from "../src/config.js";
 
 type Handler = (event: any, ctx: any) => Promise<any> | any;
 
+const statusText = {
+	readonly: "\u001b[32msafety:readonly\u001b[0m",
+	blocklist: "\u001b[33msafety:blocklist\u001b[0m",
+	off: "\u001b[31msafety:off\u001b[0m",
+};
+
 function createMock(agentDir: string) {
 	const handlers = new Map<string, Handler>();
 	const commands = new Map<string, any>();
+	const shortcuts = new Map<string, any>();
 	const pi = {
 		on: vi.fn((event: string, handler: Handler) => handlers.set(event, handler)),
 		registerCommand: vi.fn((name: string, command: any) => commands.set(name, command)),
+		registerShortcut: vi.fn((shortcut: string, options: any) => shortcuts.set(shortcut, options)),
 	};
 	const ctx = {
 		hasUI: true,
@@ -23,7 +31,7 @@ function createMock(agentDir: string) {
 		},
 	};
 	registerSafetyModes(pi as any, { agentDir });
-	return { handlers, commands, ctx };
+	return { handlers, commands, shortcuts, ctx };
 }
 
 async function tempAgentDir(): Promise<string> {
@@ -37,9 +45,10 @@ describe("extension integration", () => {
 		agentDir = await tempAgentDir();
 	});
 
-	it("registers /safety-mode command", () => {
-		const { commands } = createMock(agentDir);
+	it("registers /safety-mode command and alt+s shortcut", () => {
+		const { commands, shortcuts } = createMock(agentDir);
 		expect(commands.has("safety-mode")).toBe(true);
+		expect(shortcuts.has("alt+s")).toBe(true);
 	});
 
 	it("tool_call blocks write in readonly", async () => {
@@ -116,7 +125,20 @@ describe("extension integration", () => {
 		await commands.get("safety-mode").handler("readonly", ctx);
 		const raw = JSON.parse(await readFile(getConfigPath(agentDir), "utf8"));
 		expect(raw.mode).toBe("readonly");
-		expect(ctx.ui.setStatus).toHaveBeenCalledWith("pi-safety-modes", "safety:readonly");
+		expect(ctx.ui.setStatus).toHaveBeenCalledWith("pi-safety-modes", statusText.readonly);
+	});
+
+	it("alt+s cycles blocklist to readonly to off", async () => {
+		const { shortcuts, ctx } = createMock(agentDir);
+		await shortcuts.get("alt+s").handler(ctx);
+		let raw = JSON.parse(await readFile(getConfigPath(agentDir), "utf8"));
+		expect(raw.mode).toBe("readonly");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("pi-safety-modes", statusText.readonly);
+
+		await shortcuts.get("alt+s").handler(ctx);
+		raw = JSON.parse(await readFile(getConfigPath(agentDir), "utf8"));
+		expect(raw.mode).toBe("off");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("pi-safety-modes", statusText.off);
 	});
 
 	it("/safety-mode legacy aliases persist canonical modes", async () => {
@@ -124,11 +146,11 @@ describe("extension integration", () => {
 		await commands.get("safety-mode").handler("protected", ctx);
 		let raw = JSON.parse(await readFile(getConfigPath(agentDir), "utf8"));
 		expect(raw.mode).toBe("blocklist");
-		expect(ctx.ui.setStatus).toHaveBeenCalledWith("pi-safety-modes", "safety:blocklist");
+		expect(ctx.ui.setStatus).toHaveBeenCalledWith("pi-safety-modes", statusText.blocklist);
 
 		await commands.get("safety-mode").handler("unrestricted", ctx);
 		raw = JSON.parse(await readFile(getConfigPath(agentDir), "utf8"));
 		expect(raw.mode).toBe("off");
-		expect(ctx.ui.setStatus).toHaveBeenCalledWith("pi-safety-modes", "safety:off");
+		expect(ctx.ui.setStatus).toHaveBeenCalledWith("pi-safety-modes", statusText.off);
 	});
 });

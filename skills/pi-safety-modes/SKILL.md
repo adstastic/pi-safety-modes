@@ -13,7 +13,7 @@ pi-safety-modes is a Pi extension with three modes:
 
 This is a guardrail, not a sandbox.
 
-## Commands
+## Commands and shortcut
 
 Use slash commands when user asks to switch modes:
 
@@ -25,6 +25,11 @@ Use slash commands when user asks to switch modes:
 ```
 
 Legacy aliases: `read-only`, `ro`, `protected`, `protect`, `rules`, `denylist`, `unrestricted`.
+
+Shortcut:
+
+- `Alt+S` cycles `blocklist → readonly → off → blocklist`.
+- Footer colors: readonly green, blocklist/protected yellow, off red.
 
 ## Config path
 

@@ -38,7 +38,11 @@ pi install /absolute/path/to/pi-safety-modes
 - `blocklist` — normal coding mode. Unlisted operations are allowed; configured `ask`/`deny` rules are enforced. This is “do not do stuff on my list.”
 - `readonly` — state-preserving mode. Allows only Pi built-in read tools (`read`, `grep`, `find`, `ls`) plus explicitly allowlisted bash operations. Denies `write`, `edit`, `task`, MCP tools, opaque shell commands, redirects that write, and unknown tools.
 
-TUI statusline shows `safety:off`, `safety:blocklist`, or `safety:readonly`.
+TUI statusline shows `safety:off`, `safety:blocklist`, or `safety:readonly` (red off, yellow blocklist/protected, green readonly).
+
+Shortcut:
+
+- `Alt+S` cycles `blocklist → readonly → off → blocklist`.
 
 Use:
 
